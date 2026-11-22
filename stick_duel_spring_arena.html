@@ -1,0 +1,2438 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STICK DUEL: SPRING ARENA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="window.__peerLoadFailed = true"></script>
+  <script>
+    if (window.__peerLoadFailed) {
+      const fallbackPeer = document.createElement('script');
+      fallbackPeer.src = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+      fallbackPeer.onload = () => { window.__peerLoadFailed = false; };
+      document.head.appendChild(fallbackPeer);
+    }
+  </script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      background-color: #070b14;
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    @media (max-width: 900px) and (orientation: portrait) {
+      #portraitRotateNotice {
+        display: flex !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[#070b14] text-slate-100 antialiased selection:bg-rose-500/30">
+  <!-- Pemberitahuan Orientasi Landscape di HP -->
+  <div id="portraitRotateNotice" class="hidden fixed inset-0 z-50 flex-col items-center justify-center p-6 text-center bg-slate-950/95 backdrop-blur-md">
+    <div class="w-16 h-16 rounded-2xl border-2 border-sky-400/70 bg-sky-500/10 flex items-center justify-center mb-4">
+      <svg class="w-9 h-9 text-sky-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+        <path d="M12 18h.01"></path>
+      </svg>
+    </div>
+    <h2 class="text-xl font-black text-white mb-2">Putar HP ke Mode Landscape</h2>
+    <p class="text-xs sm:text-sm text-slate-300 max-w-xs mb-5">
+      Game ini dirancang untuk layar mendatar (landscape) agar arena dan tombol kontrol di HP terlihat luas dan nyaman.
+    </p>
+    <button id="requestLandscapeBtn" type="button" class="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-500 text-white border border-sky-300/50 cursor-pointer">
+      Kunci Mode Landscape
+    </button>
+  </div>
+
+  <div id="appRoot" class="relative w-full min-h-screen overflow-hidden bg-[#070b14]">
+    <canvas id="gameCanvas" class="w-full h-screen block"></canvas>
+
+    <!-- HUD Pertandingan -->
+    <div id="hudOverlay" class="pointer-events-none fixed top-0 left-0 right-0 z-20 p-2 sm:p-4 flex items-start justify-between gap-2 sm:gap-4">
+      <div class="w-[38%] sm:w-[36%] bg-slate-900/80 backdrop-blur-md border border-slate-700/70 rounded-xl p-2 sm:p-3 shadow-lg">
+        <div class="flex items-center justify-between gap-1 mb-1">
+          <span class="text-xs sm:text-sm font-extrabold tracking-wide text-rose-400">PEMAIN 1</span>
+          <span id="p1WeaponBadge" class="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-200 border border-rose-500/40">PARANG</span>
+        </div>
+        <div class="w-full h-2.5 sm:h-3 bg-slate-800 rounded-full overflow-hidden mb-1.5 border border-slate-700/60">
+          <div id="p1HpBar" class="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-100" style="width: 100%"></div>
+        </div>
+        <div class="flex items-center justify-between text-[10px] sm:text-xs text-slate-300 mb-1">
+          <span id="p1ResLabel">STAMINA</span>
+          <span id="p1HpText">100/100</span>
+        </div>
+        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div id="p1ResBar" class="h-full bg-gradient-to-r from-sky-500 to-cyan-300 transition-all duration-100" style="width: 100%"></div>
+        </div>
+      </div>
+
+      <div class="pointer-events-auto flex flex-col items-center bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-xl px-3 sm:px-5 py-2 shadow-lg">
+        <div id="matchTimerDisplay" class="text-base sm:text-xl font-black tracking-wider text-amber-300">1:30</div>
+        <div id="scoreDisplay" class="text-[10px] sm:text-xs font-semibold text-slate-300 whitespace-nowrap">RONDE 0 - 0 (TARGET 3)</div>
+        <button id="pauseBtn" type="button" class="mt-1.5 px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600/80 transition cursor-pointer">
+          Jeda (P)
+        </button>
+      </div>
+
+      <div class="w-[38%] sm:w-[36%] bg-slate-900/80 backdrop-blur-md border border-slate-700/70 rounded-xl p-2 sm:p-3 shadow-lg">
+        <div class="flex items-center justify-between gap-1 mb-1">
+          <span id="p2WeaponBadge" class="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-500/40">PARANG</span>
+          <span id="p2TitleLabel" class="text-xs sm:text-sm font-extrabold tracking-wide text-amber-300">PEMAIN 2</span>
+        </div>
+        <div class="w-full h-2.5 sm:h-3 bg-slate-800 rounded-full overflow-hidden mb-1.5 border border-slate-700/60">
+          <div id="p2HpBar" class="h-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-100 ml-auto" style="width: 100%"></div>
+        </div>
+        <div class="flex items-center justify-between text-[10px] sm:text-xs text-slate-300 mb-1">
+          <span id="p2HpText">100/100</span>
+          <span id="p2ResLabel">STAMINA</span>
+        </div>
+        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div id="p2ResBar" class="h-full bg-gradient-to-r from-emerald-500 to-lime-300 transition-all duration-100 ml-auto" style="width: 100%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kontrol Sentuh Mobile/Tablet -->
+    <div id="touchControls" class="fixed bottom-3 left-3 right-3 z-20 flex md:hidden items-end justify-between pointer-events-none">
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <button id="touchLeft" type="button" class="w-12 h-12 rounded-xl bg-slate-900/80 border border-slate-600/70 text-lg font-black active:bg-slate-700">←</button>
+        <button id="touchRight" type="button" class="w-12 h-12 rounded-xl bg-slate-900/80 border border-slate-600/70 text-lg font-black active:bg-slate-700">→</button>
+        <button id="touchGuard" type="button" class="px-3 h-12 rounded-xl bg-sky-900/80 border border-sky-500/60 text-xs font-extrabold text-sky-200 active:bg-sky-700">TANGKIS</button>
+      </div>
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <button id="touchDash" type="button" class="px-3 h-12 rounded-xl bg-indigo-900/80 border border-indigo-500/60 text-xs font-extrabold text-indigo-200 active:bg-indigo-700">DASH</button>
+        <button id="touchJump" type="button" class="px-3 h-12 rounded-xl bg-emerald-900/80 border border-emerald-500/60 text-xs font-extrabold text-emerald-200 active:bg-emerald-700">LOMPAT</button>
+        <button id="touchAttack" type="button" class="px-4 h-12 rounded-xl bg-rose-600/90 border border-rose-400/70 text-xs font-extrabold text-white active:bg-rose-500">SERANG</button>
+      </div>
+    </div>
+
+    <!-- Layar Mulai -->
+    <div id="startScreen" class="fixed inset-0 z-30 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm overflow-y-auto">
+      <div class="w-full max-w-4xl bg-slate-900/95 border border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-2xl my-auto">
+        <div class="text-center mb-4 sm:mb-5">
+          <p class="text-[11px] sm:text-xs font-bold uppercase tracking-[0.22em] text-sky-400 mb-1">Arena Pertempuran Leda</p>
+          <h1 class="text-2xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-rose-400 via-amber-200 to-sky-400 bg-clip-text text-transparent">
+            STICK DUEL: SPRING ARENA
+          </h1>
+        </div>
+
+        <!-- Mode Permainan & Aturan -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div class="bg-slate-800/75 border border-slate-700/70 rounded-xl p-3">
+            <div class="text-xs font-bold text-slate-300 mb-2">Mode Lawan</div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button id="modeLocalBtn" type="button" class="py-2 px-2 rounded-lg text-xs font-extrabold bg-rose-600 text-white border border-rose-400/60 cursor-pointer">2P Lokal</button>
+              <button id="modeBotBtn" type="button" class="py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Bot AI</button>
+              <button id="modeOnlineBtn" type="button" class="py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">2 Perangkat</button>
+            </div>
+            <div id="botDifficultyRow" class="mt-2 hidden">
+              <div class="text-[11px] text-slate-400 mb-1">Kesulitan Bot AI</div>
+              <div class="grid grid-cols-3 gap-1">
+                <button data-bot-diff="easy" type="button" class="bot-diff-btn py-1 rounded text-[11px] font-bold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Mudah</button>
+                <button data-bot-diff="medium" type="button" class="bot-diff-btn py-1 rounded text-[11px] font-bold bg-amber-500/20 text-amber-200 border border-amber-400/60 cursor-pointer">Sedang</button>
+                <button data-bot-diff="hard" type="button" class="bot-diff-btn py-1 rounded text-[11px] font-bold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Sulit</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-800/75 border border-slate-700/70 rounded-xl p-3">
+            <div class="text-xs font-bold text-slate-300 mb-2">Format Kemenangan</div>
+            <div class="grid grid-cols-2 gap-1.5 mb-2">
+              <button id="winModeRoundsBtn" type="button" class="py-1.5 px-2 rounded-lg text-xs font-bold bg-sky-600 text-white border border-sky-400/60 cursor-pointer">Target Ronde</button>
+              <button id="winModeStockBtn" type="button" class="py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Mode Nyawa</button>
+            </div>
+            <div class="flex items-center justify-between gap-2 text-xs">
+              <span class="text-slate-400">Target Menang:</span>
+              <div class="flex gap-1">
+                <button data-target-val="2" type="button" class="target-val-btn px-2.5 py-1 rounded bg-slate-900 text-slate-300 border border-slate-700 font-bold cursor-pointer">2</button>
+                <button data-target-val="3" type="button" class="target-val-btn px-2.5 py-1 rounded bg-sky-500/25 text-sky-200 border border-sky-400/60 font-bold cursor-pointer">3</button>
+                <button data-target-val="5" type="button" class="target-val-btn px-2.5 py-1 rounded bg-slate-900 text-slate-300 border border-slate-700 font-bold cursor-pointer">5</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-800/75 border border-slate-700/70 rounded-xl p-3">
+            <div class="text-xs font-bold text-slate-300 mb-2">Durasi Duel</div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button data-timer-val="60" type="button" class="timer-val-btn py-2 rounded-lg text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">1:00</button>
+              <button data-timer-val="90" type="button" class="timer-val-btn py-2 rounded-lg text-xs font-bold bg-amber-500/25 text-amber-200 border border-amber-400/60 cursor-pointer">1:30</button>
+              <button data-timer-val="150" type="button" class="timer-val-btn py-2 rounded-lg text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">2:30</button>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-2">Jatuh ke jurang atau HP habis = KO.</p>
+          </div>
+        </div>
+
+        <!-- Panel Koneksi 2 Perangkat -->
+        <div id="onlineLobbyPanel" class="hidden mb-4 bg-indigo-950/45 border border-indigo-500/40 rounded-xl p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-extrabold text-indigo-300">KONEKSI 2 PERANGKAT (P2P)</span>
+            <span id="netStatusText" class="text-xs font-bold text-amber-300">Belum terhubung</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="createRoomBtn" type="button" class="px-3 py-2 rounded-lg text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer">
+                Buat Ruang (P1)
+              </button>
+              <div id="roomCodeBox" class="hidden items-center gap-1.5 bg-slate-900/90 border border-indigo-400/50 px-2.5 py-1.5 rounded-lg">
+                <span class="text-[11px] text-slate-400">Kode:</span>
+                <span id="roomCodeDisplay" class="text-sm font-black tracking-widest text-emerald-300">------</span>
+                <button id="copyRoomBtn" type="button" class="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 cursor-pointer">Salin</button>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="joinRoomInput" type="text" maxlength="12" placeholder="Masukkan kode ruang" class="flex-1 min-w-0 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" />
+              <button id="joinRoomBtn" type="button" class="px-3 py-2 rounded-lg text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer">
+                Masuk
+              </button>
+              <button id="disconnectRoomBtn" type="button" class="px-2.5 py-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 cursor-pointer">
+                Putus
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pilihan Senjata Pemain 1 & Pemain 2 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <div class="bg-slate-800/65 border border-rose-500/30 rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs sm:text-sm font-extrabold text-rose-400">SENJATA PEMAIN 1</span>
+              <span id="p1SelectedWeaponDesc" class="text-[11px] text-slate-300">Tebasan cepat & knockback dekat</span>
+            </div>
+            <div id="p1WeaponGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              <button data-player="1" data-weapon="sword" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-rose-600 text-white border border-rose-300/70 cursor-pointer">Parang</button>
+              <button data-player="1" data-weapon="shuriken" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Shuriken</button>
+              <button data-player="1" data-weapon="shield" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Perisai</button>
+              <button data-player="1" data-weapon="magic" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Mbeko</button>
+            </div>
+          </div>
+
+          <div class="bg-slate-800/65 border border-amber-500/30 rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span id="p2WeaponHeader" class="text-xs sm:text-sm font-extrabold text-amber-300">SENJATA PEMAIN 2</span>
+              <span id="p2SelectedWeaponDesc" class="text-[11px] text-slate-300">Tebasan cepat & knockback dekat</span>
+            </div>
+            <div id="p2WeaponGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              <button data-player="2" data-weapon="sword" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-amber-500 text-slate-950 border border-amber-200 cursor-pointer">Parang</button>
+              <button data-player="2" data-weapon="shuriken" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Shuriken</button>
+              <button data-player="2" data-weapon="shield" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Perisai</button>
+              <button data-player="2" data-weapon="magic" type="button" class="weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold bg-slate-900 text-slate-300 border border-slate-700 cursor-pointer">Mbeko</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panduan Kontrol -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-[11px] sm:text-xs bg-slate-950/60 border border-slate-800 rounded-xl p-3 mb-4 text-slate-300">
+          <div>
+            <span class="font-extrabold text-rose-400">Pemain 1:</span> Gerak <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">A/D</kbd>, Lompat <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">W</kbd>, Tangkis <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">S</kbd>, Serang <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">F</kbd>, Dash <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">Shift</kbd>, Ganti Senjata <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">Q</kbd>
+          </div>
+          <div>
+            <span class="font-extrabold text-amber-300">Pemain 2:</span> Gerak <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">←/→</kbd>, Lompat <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">↑</kbd>, Tangkis <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">↓</kbd>, Serang <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">J/Enter</kbd>, Dash <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">/</kbd>, Ganti Senjata <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700">U</kbd>
+          </div>
+        </div>
+
+        <div class="flex justify-center">
+          <button id="startMatchBtn" type="button" class="w-full sm:w-auto px-8 py-3 rounded-xl text-sm sm:text-base font-black tracking-wide bg-gradient-to-r from-rose-600 via-amber-500 to-sky-600 hover:brightness-110 text-white shadow-lg shadow-rose-950/60 transition cursor-pointer">
+            Mulai Duel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu Jeda -->
+    <div id="pauseScreen" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+      <div class="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-6 text-center shadow-2xl">
+        <h2 class="text-2xl font-black text-white mb-2">Duel Dijeda</h2>
+        <p class="text-xs text-slate-400 mb-5">Tekan P atau Esc untuk melanjutkan duel.</p>
+        <div class="flex flex-col gap-2.5">
+          <button id="resumeBtn" type="button" class="w-full py-2.5 rounded-xl text-sm font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer">Lanjutkan</button>
+          <button id="restartFromPauseBtn" type="button" class="w-full py-2.5 rounded-xl text-sm font-extrabold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 cursor-pointer">Ulangi Duel</button>
+          <button id="exitToMenuBtn" type="button" class="w-full py-2.5 rounded-xl text-sm font-extrabold bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-700/60 cursor-pointer">Kembali ke Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Layar Kemenangan -->
+    <div id="gameOverScreen" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div class="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 text-center shadow-2xl">
+        <p class="text-xs font-bold uppercase tracking-widest text-amber-300 mb-1">Hasil Akhir</p>
+        <h2 id="winnerTitle" class="text-2xl sm:text-3xl font-black text-white mb-2">PEMAIN 1 MENANG!</h2>
+        <p id="winnerReason" class="text-xs sm:text-sm text-slate-300 mb-2">Duel selesai</p>
+        <div id="finalScoreSummary" class="text-xs font-bold text-sky-300 bg-slate-800/80 border border-slate-700 rounded-xl py-2 px-3 mb-5">
+          Skor Akhir — P1: 0 | P2: 0
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button id="rematchBtn" type="button" class="py-2.5 px-4 rounded-xl text-sm font-extrabold bg-gradient-to-r from-rose-600 to-amber-500 hover:brightness-110 text-white cursor-pointer">Duel Lagi Su</button>
+          <button id="backToMenuBtn" type="button" class="py-2.5 px-4 rounded-xl text-sm font-extrabold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 cursor-pointer">Menu Utama</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --------------------------------------------------------------------------
+    // 1. KONFIGURASI ARENA, SENJATA & STATE PERMAINAN
+    // --------------------------------------------------------------------------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const startScreen = document.getElementById('startScreen');
+    const pauseScreen = document.getElementById('pauseScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+
+    const WEAPON_ORDER = ['sword', 'shuriken', 'shield', 'magic'];
+    const WEAPONS = {
+      sword: {
+        name: 'Parang',
+        desc: 'Tebasan cepat & knockback dekat',
+        staminaCost: 12,
+        cooldown: 0.28,
+        damage: 14,
+        knockback: 260,
+        color: '#fb7185'
+      },
+      shuriken: {
+        name: 'Shuriken',
+        desc: 'Lemparan bintang tajam jarak jauh',
+        staminaCost: 16,
+        cooldown: 0.36,
+        damage: 10,
+        knockback: 150,
+        color: '#38bdf8'
+      },
+      shield: {
+        name: 'Perisai',
+        desc: 'Tangkis serangan frontal & shield bash',
+        staminaCost: 18,
+        cooldown: 0.42,
+        damage: 12,
+        knockback: 340,
+        color: '#7dd3fc'
+      },
+      magic: {
+        name: 'Mbeko',
+        desc: 'Bola energi pelacak berbahan mana',
+        manaCost: 26,
+        cooldown: 0.44,
+        damage: 17,
+        knockback: 220,
+        color: '#c084fc'
+      }
+    };
+
+    const gameState = {
+      screen: 'start',
+      paused: false,
+      playMode: 'local', // 'local' | 'bot' | 'online'
+      p2Bot: false,
+      botDifficulty: 'medium', // 'easy' | 'medium' | 'hard'
+      winMode: 'rounds', // 'rounds' | 'stock'
+      winTarget: 3,
+      matchDuration: 90,
+      matchTimer: 90,
+      p1Score: 0,
+      p2Score: 0,
+      p1Loadout: 'sword',
+      p2Loadout: 'sword',
+      hitstopTimer: 0,
+      screenShake: 0,
+      lastWinnerText: '',
+      lastReasonText: '',
+      netRole: null,
+      netConnected: false,
+      roomCode: '',
+      remoteInput: { left: false, right: false, guard: false }
+    };
+
+    const arena = {
+      width: 1280,
+      height: 720,
+      groundLeft: 140,
+      groundRight: 1140,
+      groundY: 560,
+      boundsLeft: 40,
+      boundsRight: 1240,
+      platforms: []
+    };
+
+    function rebuildArenaLayout() {
+      const w = Math.max(360, canvas.width);
+      const h = Math.max(320, canvas.height);
+      arena.width = w;
+      arena.height = h;
+      const marginX = Math.min(150, Math.max(48, w * 0.11));
+      arena.groundLeft = marginX;
+      arena.groundRight = w - marginX;
+      arena.boundsLeft = Math.max(16, marginX * 0.35);
+      arena.boundsRight = w - Math.max(16, marginX * 0.35);
+      arena.groundY = Math.min(h - 95, Math.max(240, h * 0.78));
+
+      const span = arena.groundRight - arena.groundLeft;
+      const platW = Math.min(210, Math.max(105, span * 0.2));
+      arena.platforms = [
+        {
+          x: arena.groundLeft + span * 0.14 - platW * 0.5,
+          y: arena.groundY - 115,
+          w: platW,
+          h: 14
+        },
+        {
+          x: arena.groundLeft + span * 0.5 - platW * 0.52,
+          y: arena.groundY - 195,
+          w: platW * 1.05,
+          h: 14
+        },
+        {
+          x: arena.groundLeft + span * 0.86 - platW * 0.5,
+          y: arena.groundY - 115,
+          w: platW,
+          h: 14
+        }
+      ];
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(360, Math.floor(rect.width || window.innerWidth || 960));
+      const h = Math.max(320, Math.floor(rect.height || window.innerHeight || 600));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      rebuildArenaLayout();
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      if (p1 && p2 && gameState.screen === 'start') {
+        p1.x = arena.width * 0.28;
+        p1.y = arena.groundY - 20;
+        p2.x = arena.width * 0.72;
+        p2.y = arena.groundY - 20;
+      }
+    });
+
+    // --------------------------------------------------------------------------
+    // 2. SINTESIS EFEK SUARA WEB AUDIO API
+    // --------------------------------------------------------------------------
+    const soundFX = {
+      ctx: null,
+      ensureCtx() {
+        try {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+        } catch (_) {}
+      },
+      tone(freq, endFreq, duration, type = 'sine', gainVal = 0.08) {
+        this.ensureCtx();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+          if (endFreq) osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+          gain.gain.setValueAtTime(gainVal, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + duration);
+        } catch (_) {}
+      },
+      jump() { this.tone(240, 480, 0.14, 'triangle', 0.07); },
+      dash() { this.tone(420, 150, 0.13, 'sawtooth', 0.06); },
+      slash() { this.tone(520, 160, 0.12, 'sawtooth', 0.07); },
+      throwStar() { this.tone(760, 320, 0.11, 'square', 0.05); },
+      magicCast() { this.tone(360, 740, 0.2, 'sine', 0.08); },
+      hit() { this.tone(175, 65, 0.15, 'sawtooth', 0.09); },
+      block() { this.tone(640, 880, 0.09, 'triangle', 0.08); },
+      parry() { this.tone(880, 1320, 0.18, 'sine', 0.1); },
+      clash() { this.tone(540, 220, 0.12, 'square', 0.06); },
+      ko() { this.tone(220, 48, 0.45, 'sawtooth', 0.12); },
+      victory() { this.tone(440, 880, 0.35, 'triangle', 0.09); }
+    };
+
+    // --------------------------------------------------------------------------
+    // 3. PARTIKEL, GELOMBANG KEJUT & TEKS POP-UP
+    // --------------------------------------------------------------------------
+    const projectiles = [];
+    const stuckShurikens = [];
+    const particles = [];
+    const shockwaves = [];
+    const floatingTexts = [];
+
+    function spawnParticles(x, y, color, count, speedMax = 180, lifeMax = 0.35, sizeMax = 4) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 35 + Math.random() * speedMax;
+        const life = 0.16 + Math.random() * lifeMax;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 40,
+          color,
+          life,
+          maxLife: life,
+          size: 1.8 + Math.random() * sizeMax
+        });
+      }
+    }
+
+    function spawnMagicBurst(x, y, color, radius = 56, count = 12) {
+      shockwaves.push({ x, y, radius: 8, maxRadius: radius, color, life: 0.26, maxLife: 0.26 });
+      spawnParticles(x, y, color, count, 210, 0.36, 4.2);
+    }
+
+    function addFloatingText(x, y, text, color = '#f8fafc') {
+      floatingTexts.push({ x, y, vy: -38, text, color, life: 0.78 });
+    }
+
+    // --------------------------------------------------------------------------
+    // 4. KARAKTER STICKMAN DENGAN FISIKA PEGAS (SPRING LIMBS)
+    // --------------------------------------------------------------------------
+    class Fighter {
+      constructor(id, x, y, weapon) {
+        this.id = id;
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.facing = id === 1 ? 1 : -1;
+        this.maxHp = 100;
+        this.hp = 100;
+        this.stamina = 100;
+        this.mana = 100;
+        this.weapon = WEAPONS[weapon] ? weapon : 'sword';
+
+        if (id === 1) {
+          this.primaryColor = '#f43f5e';
+          this.secondaryColor = '#38bdf8';
+          this.accentColor = '#fda4af';
+        } else {
+          this.primaryColor = '#f59e0b';
+          this.secondaryColor = '#10b981';
+          this.accentColor = '#fde68a';
+        }
+
+        this.onGround = false;
+        this.jumpsRemaining = 2;
+        this.dashTimer = 0;
+        this.dashCooldown = 0;
+        this.invulnTimer = 0;
+        this.attackCooldown = 0;
+        this.slashTimer = 0;
+        this.bashTimer = 0;
+        this.shieldActive = false;
+        this.parryTimer = 0;
+        this.hitFlashTimer = 0;
+        this.koTimer = 0;
+        this.runPhase = 0;
+
+        this.torsoLean = 0;
+        this.handFront = { x: 14, y: -4 };
+        this.handBack = { x: -12, y: 2 };
+        this.footL = { x: -8, y: 22 };
+        this.footR = { x: 8, y: 22 };
+      }
+
+      equipWeapon(weaponKey) {
+        if (WEAPONS[weaponKey]) {
+          this.weapon = weaponKey;
+          this.shieldActive = false;
+        }
+      }
+
+      cycleWeapon() {
+        const idx = WEAPON_ORDER.indexOf(this.weapon);
+        const nextKey = WEAPON_ORDER[(idx + 1) % WEAPON_ORDER.length];
+        this.equipWeapon(nextKey);
+        addFloatingText(this.x, this.y - 68, WEAPONS[nextKey].name.toUpperCase(), this.accentColor);
+      }
+
+      resetForMatch(x, y, weaponKey) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.facing = this.id === 1 ? 1 : -1;
+        this.hp = this.maxHp;
+        this.stamina = 100;
+        this.mana = 100;
+        this.equipWeapon(weaponKey || this.weapon);
+        this.onGround = false;
+        this.jumpsRemaining = 2;
+        this.dashTimer = 0;
+        this.dashCooldown = 0;
+        this.invulnTimer = 0;
+        this.attackCooldown = 0;
+        this.slashTimer = 0;
+        this.bashTimer = 0;
+        this.shieldActive = false;
+        this.parryTimer = 0;
+        this.hitFlashTimer = 0;
+        this.koTimer = 0;
+      }
+
+      respawnAt(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.facing = this.id === 1 ? 1 : -1;
+        this.hp = this.maxHp;
+        this.stamina = 100;
+        this.mana = 100;
+        this.jumpsRemaining = 2;
+        this.dashTimer = 0;
+        this.invulnTimer = 0.7;
+        this.shieldActive = false;
+        this.koTimer = 0;
+      }
+
+      setMoveInput(dir, dt) {
+        if (this.koTimer > 0) return;
+        const clamped = Math.max(-1, Math.min(1, dir));
+        if (Math.abs(clamped) > 0.05) {
+          this.facing = clamped > 0 ? 1 : -1;
+        }
+        if (this.dashTimer > 0) return;
+
+        const moveSpeed = this.shieldActive ? 175 : 335;
+        const accel = this.onGround ? 2400 : 1450;
+        const targetVx = clamped * moveSpeed;
+
+        if (this.vx < targetVx) {
+          this.vx = Math.min(targetVx, this.vx + accel * dt);
+        } else if (this.vx > targetVx) {
+          this.vx = Math.max(targetVx, this.vx - accel * dt);
+        }
+      }
+
+      setShield(active) {
+        if (this.koTimer > 0 || this.dashTimer > 0) {
+          this.shieldActive = false;
+          return;
+        }
+        const wantsShield = !!active && this.weapon === 'shield' && this.stamina > 4;
+        if (wantsShield && !this.shieldActive) {
+          this.parryTimer = 0.22;
+        }
+        this.shieldActive = wantsShield;
+      }
+
+      jump() {
+        if (this.koTimer > 0) return;
+        if (this.jumpsRemaining > 0) {
+          const isDouble = !this.onGround && this.jumpsRemaining === 1;
+          this.vy = isDouble ? -520 : -565;
+          this.onGround = false;
+          this.jumpsRemaining -= 1;
+          this.shieldActive = false;
+          soundFX.jump();
+          spawnParticles(this.x, this.y, isDouble ? this.accentColor : '#cbd5e1', isDouble ? 9 : 6, 110, 0.24, 3);
+        }
+      }
+
+      dash() {
+        if (this.koTimer > 0) return;
+        if (this.dashCooldown > 0 || this.dashTimer > 0) return;
+        if (this.stamina < 24) return;
+
+        this.stamina -= 24;
+        this.dashTimer = 0.16;
+        this.dashCooldown = 0.55;
+        this.invulnTimer = Math.max(this.invulnTimer, 0.2);
+        this.shieldActive = false;
+        this.vx = this.facing * 720;
+        this.vy = -60;
+        soundFX.dash();
+        spawnParticles(this.x, this.y - 28, this.primaryColor, 10, 170, 0.25, 3.5);
+      }
+
+      attack(opponent) {
+        if (this.koTimer > 0 || this.attackCooldown > 0) return;
+        const spec = WEAPONS[this.weapon];
+        if (!spec) return;
+
+        if (this.weapon === 'magic') {
+          if (this.mana < spec.manaCost) {
+            addFloatingText(this.x, this.y - 62, 'MANA HABIS!', '#e879f9');
+            return;
+          }
+          this.mana -= spec.manaCost;
+          this.attackCooldown = spec.cooldown;
+          this.shieldActive = false;
+          this.vx += this.facing * 90;
+          soundFX.magicCast();
+          projectiles.push({
+            ownerId: this.id,
+            kind: 'magic',
+            x: this.x + this.facing * 26,
+            y: this.y - 36,
+            vx: this.facing * 470,
+            vy: -25,
+            radius: 10,
+            damage: spec.damage,
+            knockback: spec.knockback,
+            color: spec.color,
+            homing: true,
+            age: 0,
+            life: 2.2,
+            spin: 0
+          });
+          spawnParticles(this.x + this.facing * 24, this.y - 36, spec.color, 8, 120, 0.22, 3);
+          return;
+        }
+
+        if (this.stamina < spec.staminaCost) {
+          addFloatingText(this.x, this.y - 62, 'STAMINA HABIS!', '#7dd3fc');
+          return;
+        }
+        this.stamina -= spec.staminaCost;
+        this.attackCooldown = spec.cooldown;
+        this.shieldActive = false;
+
+        if (this.weapon === 'shuriken') {
+          this.vx -= this.facing * 65;
+          soundFX.throwStar();
+          projectiles.push({
+            ownerId: this.id,
+            kind: 'shuriken',
+            x: this.x + this.facing * 24,
+            y: this.y - 36,
+            vx: this.facing * 640,
+            vy: 0,
+            radius: 9,
+            damage: spec.damage,
+            knockback: spec.knockback,
+            color: spec.color,
+            homing: false,
+            age: 0,
+            life: 1.8,
+            spin: 0
+          });
+          return;
+        }
+
+        if (this.weapon === 'shield') {
+          this.bashTimer = 0.18;
+          this.vx += this.facing * 320;
+          soundFX.slash();
+          if (opponent && opponent.koTimer <= 0) {
+            const dx = opponent.x - this.x;
+            const dy = Math.abs((opponent.y - 34) - (this.y - 34));
+            if (Math.abs(dx) < 78 && dy < 48 && Math.sign(dx || this.facing) === this.facing) {
+              opponent.takeHit(spec.damage, this.facing * spec.knockback, -210, this.facing, false);
+              addFloatingText(opponent.x, opponent.y - 68, 'SHIELD BASH!', '#7dd3fc');
+            }
+          }
+          return;
+        }
+
+        // Serangan Parang
+        this.slashTimer = 0.18;
+        this.vx += this.facing * 170;
+        soundFX.slash();
+        if (opponent && opponent.koTimer <= 0) {
+          const dx = opponent.x - this.x;
+          const dy = Math.abs((opponent.y - 34) - (this.y - 34));
+          if (Math.abs(dx) < 86 && dy < 54 && Math.sign(dx || this.facing) === this.facing) {
+            opponent.takeHit(spec.damage, this.facing * spec.knockback, -195, this.facing, false);
+          }
+        }
+      }
+
+      takeHit(amount, knockVx, knockVy, attackDir, isMagic = false) {
+        if (this.koTimer > 0) return;
+        if (this.invulnTimer > 0) return;
+
+        const frontal = attackDir !== this.facing;
+
+        if (this.shieldActive && frontal && !isMagic) {
+          if (this.parryTimer > 0) {
+            this.stamina = Math.min(100, this.stamina + 14);
+            this.invulnTimer = 0.25;
+            gameState.hitstopTimer = 0.05;
+            gameState.screenShake = 7;
+            soundFX.parry();
+            spawnMagicBurst(this.x + this.facing * 24, this.y - 36, '#fde047', 46, 10);
+            addFloatingText(this.x, this.y - 66, 'PARRY!', '#fde047');
+            return;
+          }
+
+          const staminaLoss = Math.min(this.stamina, amount * 1.35);
+          this.stamina = Math.max(0, this.stamina - staminaLoss);
+          this.vx += knockVx * 0.25;
+          gameState.screenShake = 4;
+          soundFX.block();
+          spawnParticles(this.x + this.facing * 22, this.y - 36, '#7dd3fc', 7, 130, 0.2, 3);
+          addFloatingText(this.x, this.y - 62, 'DITANGKIS!', '#7dd3fc');
+          if (this.stamina <= 2) {
+            this.shieldActive = false;
+            addFloatingText(this.x, this.y - 78, 'PERISAI JEBOL!', '#fda4af');
+          }
+          return;
+        }
+
+        this.hp = Math.max(0, this.hp - amount);
+        this.vx = knockVx;
+        this.vy = knockVy;
+        this.onGround = false;
+        this.invulnTimer = 0.22;
+        this.hitFlashTimer = 0.14;
+        this.shieldActive = false;
+        gameState.hitstopTimer = 0.045;
+        gameState.screenShake = Math.min(14, 5 + amount * 0.35);
+        soundFX.hit();
+        spawnParticles(this.x, this.y - 36, isMagic ? '#c084fc' : this.primaryColor, 10, 190, 0.28, 3.6);
+        addFloatingText(this.x, this.y - 58, `-${Math.round(amount)}`, isMagic ? '#e879f9' : '#fda4af');
+
+        if (this.hp <= 0) {
+          handleKnockout(this, 'KO!');
+        }
+      }
+
+      resolveArenaCollisions(prevY, dt) {
+        const wasOnGround = this.onGround;
+        this.onGround = false;
+
+        if (this.x < arena.boundsLeft) {
+          this.x = arena.boundsLeft;
+          if (this.vx < 0) this.vx = 0;
+        } else if (this.x > arena.boundsRight) {
+          this.x = arena.boundsRight;
+          if (this.vx > 0) this.vx = 0;
+        }
+
+        const overMainFloor = this.x >= arena.groundLeft - 8 && this.x <= arena.groundRight + 8;
+        if (this.vy >= 0 && overMainFloor && prevY <= arena.groundY + 6 && this.y >= arena.groundY) {
+          this.y = arena.groundY;
+          this.vy = 0;
+          this.onGround = true;
+          this.jumpsRemaining = 2;
+          if (!wasOnGround) {
+            spawnParticles(this.x, this.y, '#94a3b8', 4, 70, 0.18, 2.2);
+          }
+        }
+
+        const dropThrough = (keysDown.has('KeyS') && this.id === 1) || (keysDown.has('ArrowDown') && this.id === 2);
+        if (!this.onGround && this.vy >= 0 && !dropThrough) {
+          for (const plat of arena.platforms) {
+            if (this.x >= plat.x - 6 && this.x <= plat.x + plat.w + 6 && prevY <= plat.y + 6 && this.y >= plat.y) {
+              this.y = plat.y;
+              this.vy = 0;
+              this.onGround = true;
+              this.jumpsRemaining = 2;
+              break;
+            }
+          }
+        }
+
+        if (this.y > arena.height + 90) {
+          if (gameState.screen === 'playing') {
+            handleKnockout(this, 'RING OUT!');
+          } else {
+            this.respawnAt(arena.width * (this.id === 1 ? 0.28 : 0.72), arena.groundY - 24);
+          }
+        }
+      }
+
+      updateSpringLimbs(dt) {
+        const targetLean = Math.max(-0.35, Math.min(0.35, this.vx * 0.00095)) + (this.shieldActive ? this.facing * 0.12 : 0);
+        this.torsoLean += (targetLean - this.torsoLean) * Math.min(1, dt * 16);
+
+        const speedRatio = Math.min(1, Math.abs(this.vx) / 335);
+        if (this.onGround && speedRatio > 0.08) {
+          this.runPhase += dt * (8 + speedRatio * 10);
+        } else {
+          this.runPhase += dt * 2.5;
+        }
+
+        const strideX = this.onGround ? Math.sin(this.runPhase) * 14 * speedRatio : this.facing * 6;
+        const liftL = this.onGround ? Math.max(0, -Math.cos(this.runPhase)) * 8 * speedRatio : (this.vy < 0 ? 5 : 2);
+        const liftR = this.onGround ? Math.max(0, Math.cos(this.runPhase)) * 8 * speedRatio : (this.vy < 0 ? 2 : 6);
+
+        const targetFootLX = -strideX - this.facing * 4;
+        const targetFootLY = 22 - liftL;
+        const targetFootRX = strideX + this.facing * 4;
+        const targetFootRY = 22 - liftR;
+
+        const spring = Math.min(1, dt * 20);
+        this.footL.x += (targetFootLX - this.footL.x) * spring;
+        this.footL.y += (targetFootLY - this.footL.y) * spring;
+        this.footR.x += (targetFootRX - this.footR.x) * spring;
+        this.footR.y += (targetFootRY - this.footR.y) * spring;
+
+        let targetHandFX = this.facing * 16;
+        let targetHandFY = 2;
+        if (this.slashTimer > 0) {
+          targetHandFX = this.facing * 24;
+          targetHandFY = -10 + Math.sin((1 - this.slashTimer / 0.18) * Math.PI) * 16;
+        } else if (this.bashTimer > 0 || this.shieldActive) {
+          targetHandFX = this.facing * 20;
+          targetHandFY = -4;
+        } else if (this.weapon === 'magic' || this.weapon === 'shuriken') {
+          targetHandFX = this.facing * 18;
+          targetHandFY = -2;
+        }
+
+        const targetHandBX = -this.facing * 12 + Math.cos(this.runPhase) * 5 * speedRatio;
+        const targetHandBY = 4 + Math.sin(this.runPhase) * 4 * speedRatio;
+
+        this.handFront.x += (targetHandFX - this.handFront.x) * spring;
+        this.handFront.y += (targetHandFY - this.handFront.y) * spring;
+        this.handBack.x += (targetHandBX - this.handBack.x) * spring;
+        this.handBack.y += (targetHandBY - this.handBack.y) * spring;
+      }
+
+      update(dt, opponent) {
+        if (this.koTimer > 0) {
+          this.koTimer = Math.max(0, this.koTimer - dt);
+        }
+        if (this.dashCooldown > 0) this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+        if (this.invulnTimer > 0) this.invulnTimer = Math.max(0, this.invulnTimer - dt);
+        if (this.attackCooldown > 0) this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+        if (this.slashTimer > 0) this.slashTimer = Math.max(0, this.slashTimer - dt);
+        if (this.bashTimer > 0) this.bashTimer = Math.max(0, this.bashTimer - dt);
+        if (this.parryTimer > 0) this.parryTimer = Math.max(0, this.parryTimer - dt);
+        if (this.hitFlashTimer > 0) this.hitFlashTimer = Math.max(0, this.hitFlashTimer - dt);
+
+        if (!this.shieldActive && this.dashTimer <= 0) {
+          this.stamina = Math.min(100, this.stamina + 20 * dt);
+        }
+        this.mana = Math.min(100, this.mana + 18 * dt);
+
+        if (this.dashTimer > 0) {
+          this.dashTimer = Math.max(0, this.dashTimer - dt);
+          this.vy = Math.max(-120, this.vy * 0.7);
+        } else {
+          this.vy += 1320 * dt;
+          if (this.onGround && Math.abs(this.vx) < 8) {
+            this.vx *= Math.pow(0.001, dt);
+          } else {
+            this.vx *= Math.pow(0.18, dt);
+          }
+        }
+
+        const prevY = this.y;
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        this.resolveArenaCollisions(prevY, dt);
+        this.updateSpringLimbs(dt);
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 5. UI MENU AWAL & PENGATURAN LOADOUT
+    // --------------------------------------------------------------------------
+    function syncStartScreenUI() {
+      const localBtn = document.getElementById('modeLocalBtn');
+      const botBtn = document.getElementById('modeBotBtn');
+      const onlineBtn = document.getElementById('modeOnlineBtn');
+      const botRow = document.getElementById('botDifficultyRow');
+      const onlinePanel = document.getElementById('onlineLobbyPanel');
+
+      if (localBtn && botBtn && onlineBtn) {
+        localBtn.className = `py-2 px-2 rounded-lg text-xs font-extrabold border cursor-pointer ${gameState.playMode === 'local' ? 'bg-rose-600 text-white border-rose-400/60' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+        botBtn.className = `py-2 px-2 rounded-lg text-xs font-extrabold border cursor-pointer ${gameState.playMode === 'bot' ? 'bg-amber-500 text-slate-950 border-amber-200' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+        onlineBtn.className = `py-2 px-2 rounded-lg text-xs font-extrabold border cursor-pointer ${gameState.playMode === 'online' ? 'bg-indigo-600 text-white border-indigo-400/60' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+      }
+
+      if (botRow) botRow.classList.toggle('hidden', gameState.playMode !== 'bot');
+      if (onlinePanel) onlinePanel.classList.toggle('hidden', gameState.playMode !== 'online');
+
+      document.querySelectorAll('.bot-diff-btn').forEach((btn) => {
+        const active = btn.dataset.botDiff === gameState.botDifficulty;
+        btn.className = `bot-diff-btn py-1 rounded text-[11px] font-bold border cursor-pointer ${active ? 'bg-amber-500/25 text-amber-200 border-amber-400/60' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+      });
+
+      const roundsBtn = document.getElementById('winModeRoundsBtn');
+      const stockBtn = document.getElementById('winModeStockBtn');
+      if (roundsBtn && stockBtn) {
+        roundsBtn.className = `py-1.5 px-2 rounded-lg text-xs font-bold border cursor-pointer ${gameState.winMode === 'rounds' ? 'bg-sky-600 text-white border-sky-400/60' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+        stockBtn.className = `py-1.5 px-2 rounded-lg text-xs font-bold border cursor-pointer ${gameState.winMode === 'stock' ? 'bg-sky-600 text-white border-sky-400/60' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+      }
+
+      document.querySelectorAll('.target-val-btn').forEach((btn) => {
+        const active = Number(btn.dataset.targetVal) === gameState.winTarget;
+        btn.className = `target-val-btn px-2.5 py-1 rounded text-xs font-bold border cursor-pointer ${active ? 'bg-sky-500/25 text-sky-200 border-sky-400/60' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+      });
+
+      document.querySelectorAll('.timer-val-btn').forEach((btn) => {
+        const active = Number(btn.dataset.timerVal) === gameState.matchDuration;
+        btn.className = `timer-val-btn py-2 rounded-lg text-xs font-bold border cursor-pointer ${active ? 'bg-amber-500/25 text-amber-200 border-amber-400/60' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+      });
+
+      document.querySelectorAll('.weapon-btn').forEach((btn) => {
+        const playerNum = Number(btn.dataset.player);
+        const wKey = btn.dataset.weapon;
+        const selected = playerNum === 1 ? gameState.p1Loadout === wKey : gameState.p2Loadout === wKey;
+        if (playerNum === 1) {
+          btn.className = `weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold border cursor-pointer ${selected ? 'bg-rose-600 text-white border-rose-300/70' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+        } else {
+          btn.className = `weapon-btn py-2 px-2 rounded-lg text-xs font-extrabold border cursor-pointer ${selected ? 'bg-amber-500 text-slate-950 border-amber-200' : 'bg-slate-900 text-slate-300 border-slate-700'}`;
+        }
+      });
+
+      const p1Spec = WEAPONS[gameState.p1Loadout] || WEAPONS.sword;
+      const p2Spec = WEAPONS[gameState.p2Loadout] || WEAPONS.sword;
+      const p1Desc = document.getElementById('p1SelectedWeaponDesc');
+      const p2Desc = document.getElementById('p2SelectedWeaponDesc');
+      const p2Header = document.getElementById('p2WeaponHeader');
+      if (p1Desc) p1Desc.textContent = p1Spec.desc;
+      if (p2Desc) p2Desc.textContent = p2Spec.desc;
+      if (p2Header) {
+        p2Header.textContent = gameState.p2Bot ? 'SENJATA BOT AI' : (gameState.playMode === 'online' ? 'SENJATA PEMAIN 2 (ONLINE)' : 'SENJATA PEMAIN 2');
+      }
+    }
+
+    document.getElementById('modeLocalBtn').addEventListener('click', () => {
+      gameState.playMode = 'local';
+      gameState.p2Bot = false;
+      syncStartScreenUI();
+      updateHud();
+    });
+    document.getElementById('modeBotBtn').addEventListener('click', () => {
+      gameState.playMode = 'bot';
+      gameState.p2Bot = true;
+      syncStartScreenUI();
+      updateHud();
+    });
+    document.getElementById('modeOnlineBtn').addEventListener('click', () => {
+      gameState.playMode = 'online';
+      gameState.p2Bot = false;
+      syncStartScreenUI();
+      updateHud();
+    });
+
+    document.querySelectorAll('.bot-diff-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        gameState.botDifficulty = btn.dataset.botDiff || 'medium';
+        syncStartScreenUI();
+      });
+    });
+
+    document.getElementById('winModeRoundsBtn').addEventListener('click', () => {
+      gameState.winMode = 'rounds';
+      syncStartScreenUI();
+      updateHud();
+    });
+    document.getElementById('winModeStockBtn').addEventListener('click', () => {
+      gameState.winMode = 'stock';
+      syncStartScreenUI();
+      updateHud();
+    });
+
+    document.querySelectorAll('.target-val-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        gameState.winTarget = Number(btn.dataset.targetVal) || 3;
+        syncStartScreenUI();
+        updateHud();
+      });
+    });
+
+    document.querySelectorAll('.timer-val-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        gameState.matchDuration = Number(btn.dataset.timerVal) || 90;
+        gameState.matchTimer = gameState.matchDuration;
+        syncStartScreenUI();
+        updateHud();
+      });
+    });
+
+    document.querySelectorAll('.weapon-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const playerNum = Number(btn.dataset.player);
+        const wKey = btn.dataset.weapon;
+        if (!WEAPONS[wKey]) return;
+        ensureFightersInitialized();
+        if (playerNum === 1) {
+          gameState.p1Loadout = wKey;
+          p1.equipWeapon(wKey);
+          if (gameState.playMode === 'online' && gameState.netRole === 'host') {
+            netSync.send({ type: 'loadout', player: 1, weapon: wKey });
+          }
+        } else if (playerNum === 2) {
+          gameState.p2Loadout = wKey;
+          p2.equipWeapon(wKey);
+          if (gameState.playMode === 'online' && gameState.netRole === 'guest') {
+            netSync.send({ type: 'loadout', player: 2, weapon: wKey });
+          }
+        }
+        syncStartScreenUI();
+        updateHud();
+      });
+    });
+
+    // --------------------------------------------------------------------------
+    // 6. SINKRONISASI 2 PERANGKAT (PEERJS / WEBRTC)
+    // --------------------------------------------------------------------------
+    const netSync = {
+      peer: null,
+      conn: null,
+      stateSyncTimer: 0,
+      isAvailable() {
+        return !window.__peerLoadFailed && typeof window.Peer === 'function';
+      },
+      describePeerError(err, fallbackText) {
+        const type = err && err.type ? String(err.type) : '';
+        if (type === 'unavailable-id') return 'Kode ruang sedang dipakai, mencoba ulang...';
+        if (type === 'peer-unavailable') return 'Kode ruang tidak ditemukan atau lawan belum aktif';
+        if (type === 'network' || type === 'disconnected' || type === 'socket-error' || type === 'socket-closed') {
+          return 'Koneksi ke server sinyal P2P terputus / diblokir jaringan';
+        }
+        if (type === 'browser-incompatible' || type === 'webrtc') {
+          return 'Browser atau perangkat tidak mendukung WebRTC P2P';
+        }
+        if (type === 'server-error') return 'Server sinyal P2P sedang bermasalah';
+        const msg = err && err.message ? String(err.message).trim() : '';
+        return msg ? `${fallbackText}: ${msg}` : fallbackText;
+      },
+      setStatus(text, colorClass = 'text-amber-300') {
+        const el = document.getElementById('netStatusText');
+        if (!el) return;
+        el.textContent = text;
+        el.className = `text-xs font-bold ${colorClass}`;
+      },
+      send(payload) {
+        if (!this.conn || !gameState.netConnected || this.conn.open !== true) return;
+        try {
+          this.conn.send(payload);
+        } catch (_) {}
+      },
+      disconnect() {
+        gameState.netConnected = false;
+        gameState.netRole = null;
+        gameState.roomCode = '';
+        gameState.remoteInput = { left: false, right: false, guard: false };
+        try {
+          if (this.conn) this.conn.close();
+        } catch (_) {}
+        try {
+          if (this.peer) this.peer.destroy();
+        } catch (_) {}
+        this.conn = null;
+        this.peer = null;
+        const box = document.getElementById('roomCodeBox');
+        if (box) {
+          box.classList.add('hidden');
+          box.classList.remove('flex');
+        }
+        this.setStatus('Belum terhubung', 'text-amber-300');
+      },
+      revealRoomCode(code) {
+        gameState.roomCode = code;
+        const box = document.getElementById('roomCodeBox');
+        const disp = document.getElementById('roomCodeDisplay');
+        if (disp) disp.textContent = code;
+        if (box) {
+          box.classList.remove('hidden');
+          box.classList.add('flex');
+        }
+      },
+      generateCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+      },
+
+      createRoom(retryCount = 0) {
+        const code = retryCount === 0 && gameState.roomCode ? gameState.roomCode : this.generateCode();
+        if (retryCount === 0) {
+          this.disconnect();
+        }
+        const peerId = `STICKDUEL-${code}`;
+        gameState.netRole = 'host';
+        this.revealRoomCode(code);
+
+        if (!this.isAvailable()) {
+          this.setStatus(`Kode ${code} siap (P2P diblokir/offline, gunakan 2P Lokal/Bot)`, 'text-amber-300');
+          return;
+        }
+
+        this.setStatus(`Menghubungkan ruang ${code}...`, 'text-sky-300');
+
+        let opened = false;
+        const openTimeout = setTimeout(() => {
+          if (!opened && gameState.netRole === 'host' && !gameState.netConnected) {
+            if (retryCount < 1) {
+              this.createRoom(retryCount + 1);
+            } else {
+              this.revealRoomCode(code);
+              this.setStatus(`Kode ${code} aktif (menunggu / P2P terbatas)`, 'text-amber-300');
+            }
+          }
+        }, 5500);
+
+        try {
+          this.peer = new window.Peer(peerId, {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+              ]
+            }
+          });
+          this.peer.on('open', () => {
+            opened = true;
+            clearTimeout(openTimeout);
+            this.revealRoomCode(code);
+            this.setStatus(`Menunggu lawan (${code})...`, 'text-emerald-300');
+          });
+          this.peer.on('connection', (conn) => {
+            this.bindConnection(conn);
+          });
+          this.peer.on('error', (err) => {
+            clearTimeout(openTimeout);
+            this.revealRoomCode(code);
+            const errType = err && err.type ? err.type : 'error';
+            if ((errType === 'unavailable-id' || errType === 'network' || errType === 'server-error' || errType === 'socket-error') && retryCount < 1) {
+              this.createRoom(retryCount + 1);
+              return;
+            }
+            this.setStatus(this.describePeerError(err, `Kode ${code} — Gagal koneksi P2P`), 'text-rose-400');
+          });
+        } catch (err) {
+          clearTimeout(openTimeout);
+          this.revealRoomCode(code);
+          this.setStatus(this.describePeerError(err, `Kode ${code} — Gagal koneksi P2P`), 'text-rose-400');
+        }
+      },
+
+      joinRoom(rawCode) {
+        const clean = String(rawCode || '').trim().toUpperCase();
+        if (!clean) {
+          this.setStatus('Masukkan kode ruang terlebih dahulu', 'text-rose-400');
+          return;
+        }
+        if (!this.isAvailable()) {
+          this.setStatus('Pustaka P2P gagal dimuat (gunakan 2P Lokal / Bot AI)', 'text-rose-400');
+          return;
+        }
+        this.disconnect();
+        gameState.roomCode = clean;
+        gameState.netRole = 'guest';
+        this.setStatus(`Menganalisis rute ke ruang ${clean}...`, 'text-sky-300');
+
+        try {
+          this.peer = new window.Peer(undefined, {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+              ]
+            }
+          });
+          this.peer.on('open', () => {
+            const conn = this.peer.connect(`STICKDUEL-${clean}`, { reliable: true });
+            this.bindConnection(conn);
+          });
+          this.peer.on('error', (err) => {
+            this.setStatus(this.describePeerError(err, 'Gagal menganalisis koneksi ruang'), 'text-rose-400');
+          });
+        } catch (err) {
+          this.setStatus(this.describePeerError(err, 'Gagal menganalisis koneksi ruang'), 'text-rose-400');
+        }
+      },
+
+      bindConnection(conn) {
+        this.conn = conn;
+        conn.on('open', () => {
+          gameState.netConnected = true;
+          this.setStatus('Terhubung (2 Perangkat)', 'text-emerald-300');
+          this.send({
+            type: 'loadout',
+            player: gameState.netRole === 'host' ? 1 : 2,
+            weapon: gameState.netRole === 'host' ? gameState.p1Loadout : gameState.p2Loadout
+          });
+        });
+        conn.on('data', (data) => {
+          this.handleMessage(data);
+        });
+        conn.on('close', () => {
+          gameState.netConnected = false;
+          gameState.remoteInput = { left: false, right: false, guard: false };
+          this.setStatus('Koneksi P2P terputus', 'text-rose-400');
+        });
+        conn.on('error', (err) => {
+          gameState.netConnected = false;
+          this.setStatus(this.describePeerError(err, 'Gagal menganalisis saluran P2P'), 'text-rose-400');
+        });
+      },
+
+      handleMessage(msg) {
+        if (!msg || typeof msg !== 'object') return;
+        ensureFightersInitialized();
+
+        if (msg.type === 'loadout') {
+          if (msg.player === 1 && WEAPONS[msg.weapon]) {
+            gameState.p1Loadout = msg.weapon;
+            p1.equipWeapon(msg.weapon);
+          } else if (msg.player === 2 && WEAPONS[msg.weapon]) {
+            gameState.p2Loadout = msg.weapon;
+            p2.equipWeapon(msg.weapon);
+          }
+          syncStartScreenUI();
+          updateHud();
+        } else if (msg.type === 'start_match') {
+          if (WEAPONS[msg.p1Loadout]) gameState.p1Loadout = msg.p1Loadout;
+          if (WEAPONS[msg.p2Loadout]) gameState.p2Loadout = msg.p2Loadout;
+          if (msg.mode) gameState.winMode = msg.mode;
+          if (msg.target) gameState.winTarget = Number(msg.target) || 3;
+          if (msg.timer) gameState.matchDuration = Number(msg.timer) || 90;
+          startNewMatch(true);
+        } else if (msg.type === 'guest_input' && gameState.netRole === 'host') {
+          gameState.remoteInput.left = !!msg.left;
+          gameState.remoteInput.right = !!msg.right;
+          gameState.remoteInput.guard = !!msg.guard;
+        } else if (msg.type === 'guest_action' && gameState.netRole === 'host') {
+          if (msg.action === 'jump') p2.jump();
+          else if (msg.action === 'dash') p2.dash();
+          else if (msg.action === 'attack') p2.attack(p1);
+          else if (msg.action === 'swap') {
+            p2.cycleWeapon();
+            gameState.p2Loadout = p2.weapon;
+          }
+        } else if (msg.type === 'host_action' && gameState.netRole === 'guest') {
+          if (msg.action === 'jump') p1.jump();
+          else if (msg.action === 'dash') p1.dash();
+          else if (msg.action === 'attack') p1.attack(p2);
+          else if (msg.action === 'swap') {
+            p1.cycleWeapon();
+            gameState.p1Loadout = p1.weapon;
+          }
+        } else if (msg.type === 'world_snapshot' && gameState.netRole === 'guest') {
+          gameState.matchTimer = typeof msg.matchTimer === 'number' ? msg.matchTimer : gameState.matchTimer;
+          gameState.p1Score = typeof msg.p1Score === 'number' ? msg.p1Score : gameState.p1Score;
+          gameState.p2Score = typeof msg.p2Score === 'number' ? msg.p2Score : gameState.p2Score;
+          if (msg.p1) applyFighterSnapshot(p1, msg.p1);
+          if (msg.p2) applyFighterSnapshot(p2, msg.p2);
+          if (msg.screen === 'gameover' && gameState.screen !== 'gameover') {
+            showGameOverScreen(msg.winnerText || 'SELESAI', msg.reasonText || '', true);
+          }
+        }
+      },
+
+      broadcastWorldSnapshot(dt) {
+        if (gameState.playMode !== 'online' || gameState.netRole !== 'host' || !gameState.netConnected) return;
+        this.stateSyncTimer += dt;
+        if (this.stateSyncTimer < 0.05) return;
+        this.stateSyncTimer = 0;
+
+        this.send({
+          type: 'world_snapshot',
+          matchTimer: gameState.matchTimer,
+          p1Score: gameState.p1Score,
+          p2Score: gameState.p2Score,
+          screen: gameState.screen,
+          p1: getFighterSnapshot(p1),
+          p2: getFighterSnapshot(p2)
+        });
+      }
+    };
+
+    function getFighterSnapshot(f) {
+      return {
+        x: f.x,
+        y: f.y,
+        vx: f.vx,
+        vy: f.vy,
+        facing: f.facing,
+        hp: f.hp,
+        stamina: f.stamina,
+        mana: f.mana,
+        weapon: f.weapon,
+        shieldActive: f.shieldActive,
+        slashTimer: f.slashTimer,
+        bashTimer: f.bashTimer,
+        koTimer: f.koTimer
+      };
+    }
+
+    function applyFighterSnapshot(f, snap) {
+      f.x = f.x + (snap.x - f.x) * 0.65;
+      f.y = f.y + (snap.y - f.y) * 0.65;
+      f.vx = snap.vx;
+      f.vy = snap.vy;
+      f.facing = snap.facing;
+      f.hp = snap.hp;
+      f.stamina = snap.stamina;
+      f.mana = snap.mana;
+      if (snap.weapon && WEAPONS[snap.weapon]) f.weapon = snap.weapon;
+      f.shieldActive = !!snap.shieldActive;
+      f.slashTimer = snap.slashTimer || 0;
+      f.bashTimer = snap.bashTimer || 0;
+      f.koTimer = snap.koTimer || 0;
+    }
+
+    document.getElementById('createRoomBtn').addEventListener('click', () => netSync.createRoom());
+    document.getElementById('joinRoomBtn').addEventListener('click', () => {
+      const inp = document.getElementById('joinRoomInput');
+      netSync.joinRoom(inp ? inp.value : '');
+    });
+    document.getElementById('disconnectRoomBtn').addEventListener('click', () => netSync.disconnect());
+    document.getElementById('copyRoomBtn').addEventListener('click', () => {
+      const codeText = gameState.roomCode || document.getElementById('roomCodeDisplay')?.textContent || '';
+      if (!codeText || codeText === '------') return;
+      try {
+        const temp = document.createElement('textarea');
+        temp.value = codeText;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        addFloatingText(arena.width * 0.5, 90, `KODE ${codeText} DISALIN`, '#34d399');
+      } catch (_) {}
+    });
+
+    // --------------------------------------------------------------------------
+    // 7. INPUT KEYBOARD & SENTUH
+    // --------------------------------------------------------------------------
+    const keysDown = new Set();
+    const touchState = { left: false, right: false, guard: false };
+    let lastGuestInputSent = '';
+
+    function triggerLocalPlayerAction(playerNum, action) {
+      ensureFightersInitialized();
+      if (gameState.screen !== 'playing') return;
+
+      if (gameState.playMode === 'online') {
+        if (gameState.netRole === 'host' && playerNum === 1) {
+          if (action === 'jump') p1.jump();
+          else if (action === 'dash') p1.dash();
+          else if (action === 'attack') p1.attack(p2);
+          else if (action === 'swap') {
+            p1.cycleWeapon();
+            gameState.p1Loadout = p1.weapon;
+          }
+          netSync.send({ type: 'host_action', action });
+        } else if (gameState.netRole === 'guest' && playerNum === 2) {
+          if (action === 'jump') p2.jump();
+          else if (action === 'dash') p2.dash();
+          else if (action === 'attack') p2.attack(p1);
+          else if (action === 'swap') {
+            p2.cycleWeapon();
+            gameState.p2Loadout = p2.weapon;
+          }
+          netSync.send({ type: 'guest_action', action });
+        }
+        return;
+      }
+
+      if (playerNum === 1) {
+        if (action === 'jump') p1.jump();
+        else if (action === 'dash') p1.dash();
+        else if (action === 'attack') p1.attack(p2);
+        else if (action === 'swap') {
+          p1.cycleWeapon();
+          gameState.p1Loadout = p1.weapon;
+        }
+      } else if (playerNum === 2 && !gameState.p2Bot) {
+        if (action === 'jump') p2.jump();
+        else if (action === 'dash') p2.dash();
+        else if (action === 'attack') p2.attack(p1);
+        else if (action === 'swap') {
+          p2.cycleWeapon();
+          gameState.p2Loadout = p2.weapon;
+        }
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const code = e.code;
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(code)) {
+        if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+        e.preventDefault();
+      }
+
+      if (code === 'KeyP' || code === 'Escape') {
+        if (gameState.screen === 'playing' || gameState.screen === 'paused') {
+          togglePause();
+        }
+        return;
+      }
+
+      if (e.repeat) return;
+      keysDown.add(code);
+
+      if (gameState.screen !== 'playing') return;
+
+      if (code === 'KeyW') triggerLocalPlayerAction(1, 'jump');
+      else if (code === 'ShiftLeft' || code === 'ShiftRight') triggerLocalPlayerAction(1, 'dash');
+      else if (code === 'KeyF') triggerLocalPlayerAction(1, 'attack');
+      else if (code === 'KeyQ') triggerLocalPlayerAction(1, 'swap');
+      else if (code === 'ArrowUp') triggerLocalPlayerAction(2, 'jump');
+      else if (code === 'Slash') triggerLocalPlayerAction(2, 'dash');
+      else if (code === 'KeyJ' || code === 'Enter') triggerLocalPlayerAction(2, 'attack');
+      else if (code === 'KeyU') triggerLocalPlayerAction(2, 'swap');
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keysDown.delete(e.code);
+    });
+
+    function bindTouchHold(elId, flagKey) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const setVal = (v) => { touchState[flagKey] = v; };
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); setVal(true); }, { passive: false });
+      el.addEventListener('touchend', (e) => { e.preventDefault(); setVal(false); }, { passive: false });
+      el.addEventListener('touchcancel', () => setVal(false));
+      el.addEventListener('mousedown', () => setVal(true));
+      el.addEventListener('mouseup', () => setVal(false));
+      el.addEventListener('mouseleave', () => setVal(false));
+    }
+
+    bindTouchHold('touchLeft', 'left');
+    bindTouchHold('touchRight', 'right');
+    bindTouchHold('touchGuard', 'guard');
+    document.getElementById('touchJump').addEventListener('click', () => triggerLocalPlayerAction(1, 'jump'));
+    document.getElementById('touchDash').addEventListener('click', () => triggerLocalPlayerAction(1, 'dash'));
+    document.getElementById('touchAttack').addEventListener('click', () => triggerLocalPlayerAction(1, 'attack'));
+
+    let aiDecisionTimer = 0;
+    let aiMoveDir = 0;
+    let aiWantsGuard = false;
+
+    function updateBotAI(dt, bot, target) {
+      if (!bot || !target || bot.koTimer > 0) return;
+      aiDecisionTimer -= dt;
+      if (aiDecisionTimer <= 0) {
+        const interval = gameState.botDifficulty === 'hard' ? 0.14 : (gameState.botDifficulty === 'medium' ? 0.24 : 0.42);
+        aiDecisionTimer = interval;
+
+        const dx = target.x - bot.x;
+        const dy = target.y - bot.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (bot.x < arena.groundLeft + 45) {
+          aiMoveDir = 1;
+        } else if (bot.x > arena.groundRight - 45) {
+          aiMoveDir = -1;
+        } else if (dist > 140) {
+          aiMoveDir = Math.sign(dx);
+        } else if (dist < 65 && bot.weapon !== 'shield') {
+          aiMoveDir = -Math.sign(dx || 1);
+        } else {
+          aiMoveDir = Math.sign(dx);
+        }
+
+        aiWantsGuard = bot.weapon === 'shield' && dist < 130 && Math.random() < (gameState.botDifficulty === 'hard' ? 0.7 : 0.4);
+
+        if (dy < -75 && bot.jumpsRemaining > 0 && Math.random() < 0.65) {
+          bot.jump();
+        }
+        if (dist > 220 && bot.dashCooldown <= 0 && Math.random() < 0.35) {
+          bot.dash();
+        }
+        if (dist < (bot.weapon === 'sword' || bot.weapon === 'shield' ? 95 : 420)) {
+          if (Math.random() < (gameState.botDifficulty === 'hard' ? 0.78 : 0.48)) {
+            bot.attack(target);
+          }
+        }
+      }
+
+      bot.setMoveInput(aiMoveDir, dt);
+      bot.setShield(aiWantsGuard);
+    }
+
+    function applyContinuousInputs(dt) {
+      if (gameState.playMode === 'online') {
+        if (gameState.netRole === 'host') {
+          const p1Dir = (keysDown.has('KeyD') || touchState.right ? 1 : 0) - (keysDown.has('KeyA') || touchState.left ? 1 : 0);
+          p1.setMoveInput(p1Dir, dt);
+          p1.setShield(keysDown.has('KeyS') || touchState.guard);
+
+          const p2Dir = (gameState.remoteInput.right ? 1 : 0) - (gameState.remoteInput.left ? 1 : 0);
+          p2.setMoveInput(p2Dir, dt);
+          p2.setShield(gameState.remoteInput.guard);
+        } else if (gameState.netRole === 'guest') {
+          const left = keysDown.has('ArrowLeft') || keysDown.has('KeyA') || touchState.left;
+          const right = keysDown.has('ArrowRight') || keysDown.has('KeyD') || touchState.right;
+          const guard = keysDown.has('ArrowDown') || keysDown.has('KeyS') || touchState.guard;
+          const p2Dir = (right ? 1 : 0) - (left ? 1 : 0);
+          p2.setMoveInput(p2Dir, dt);
+          p2.setShield(guard);
+
+          const sig = `${left ? 1 : 0}${right ? 1 : 0}${guard ? 1 : 0}`;
+          if (sig !== lastGuestInputSent) {
+            lastGuestInputSent = sig;
+            netSync.send({ type: 'guest_input', left, right, guard });
+          }
+        }
+        return;
+      }
+
+      const p1Dir = (keysDown.has('KeyD') || touchState.right ? 1 : 0) - (keysDown.has('KeyA') || touchState.left ? 1 : 0);
+      p1.setMoveInput(p1Dir, dt);
+      p1.setShield(keysDown.has('KeyS') || touchState.guard);
+
+      if (gameState.p2Bot) {
+        updateBotAI(dt, p2, p1);
+      } else {
+        const p2Dir = (keysDown.has('ArrowRight') ? 1 : 0) - (keysDown.has('ArrowLeft') ? 1 : 0);
+        p2.setMoveInput(p2Dir, dt);
+        p2.setShield(keysDown.has('ArrowDown'));
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 8. PROYEKTIL, BENTURAN & KO / RONDE
+    // --------------------------------------------------------------------------
+    function updateCombatEntities(dt, fighter1, fighter2) {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const pr = projectiles[i];
+        pr.age += dt;
+        pr.life -= dt;
+        pr.spin += dt * 18;
+
+        const target = pr.ownerId === 1 ? fighter2 : fighter1;
+
+        if (pr.homing && target && target.koTimer <= 0) {
+          const desiredAngle = Math.atan2((target.y - 34) - pr.y, target.x - pr.x);
+          const currentAngle = Math.atan2(pr.vy, pr.vx);
+          let diff = desiredAngle - currentAngle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          const turnRate = 3.6 * dt;
+          const nextAngle = currentAngle + Math.max(-turnRate, Math.min(turnRate, diff));
+          const speed = Math.hypot(pr.vx, pr.vy) || 520;
+          pr.vx = Math.cos(nextAngle) * speed;
+          pr.vy = Math.sin(nextAngle) * speed;
+        }
+
+        pr.x += pr.vx * dt;
+        pr.y += pr.vy * dt;
+
+        if (pr.kind === 'magic' && Math.random() < 0.7) {
+          spawnParticles(pr.x, pr.y, pr.color, 1, 45, 0.16, 2.6);
+        }
+
+        let hitWall = false;
+        if (pr.vy > 0 && pr.x >= arena.groundLeft && pr.x <= arena.groundRight && pr.y >= arena.groundY && pr.y <= arena.groundY + 14) {
+          hitWall = true;
+        }
+        if (!hitWall && pr.vy > 0) {
+          for (const plat of arena.platforms) {
+            if (pr.x >= plat.x && pr.x <= plat.x + plat.w && pr.y >= plat.y && pr.y <= plat.y + plat.h) {
+              hitWall = true;
+              break;
+            }
+          }
+        }
+
+        if (hitWall) {
+          if (pr.kind === 'shuriken') {
+            stuckShurikens.push({ x: pr.x, y: pr.y, angle: pr.spin, life: 4.5 });
+            spawnParticles(pr.x, pr.y, '#cbd5e1', 5, 110, 0.2, 2.5);
+          } else if (pr.kind === 'magic') {
+            spawnMagicBurst(pr.x, pr.y, pr.color, 44, 10);
+          }
+          projectiles.splice(i, 1);
+          continue;
+        }
+
+        if (target && target.koTimer <= 0 && target.invulnTimer <= 0) {
+          const hitCenterY = target.y - 34;
+          const dist = Math.hypot(pr.x - target.x, pr.y - hitCenterY);
+          if (dist <= pr.radius + 20) {
+            const dir = Math.sign(pr.vx || (target.x - pr.x) || 1);
+            target.takeHit(pr.damage, dir * pr.knockback, -150, dir, pr.kind === 'magic');
+            if (pr.kind === 'magic') {
+              spawnMagicBurst(pr.x, pr.y, pr.color, 52, 12);
+            }
+            projectiles.splice(i, 1);
+            continue;
+          }
+        }
+
+        if (pr.life <= 0 || pr.x < -80 || pr.x > arena.width + 80 || pr.y > arena.height + 80) {
+          projectiles.splice(i, 1);
+        }
+      }
+
+      // Benturan antar proyektil lawan
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        for (let j = i - 1; j >= 0; j--) {
+          const a = projectiles[i];
+          const b = projectiles[j];
+          if (!a || !b || a.ownerId === b.ownerId) continue;
+          if (Math.hypot(a.x - b.x, a.y - b.y) <= a.radius + b.radius + 4) {
+            const mx = (a.x + b.x) * 0.5;
+            const my = (a.y + b.y) * 0.5;
+            spawnParticles(mx, my, '#fde047', 8, 160, 0.22, 3.2);
+            addFloatingText(mx, my - 18, 'CLASH!', '#fde047');
+            soundFX.clash();
+            projectiles.splice(i, 1);
+            projectiles.splice(j, 1);
+            i--;
+            break;
+          }
+        }
+      }
+
+      for (let i = stuckShurikens.length - 1; i >= 0; i--) {
+        stuckShurikens[i].life -= dt;
+        if (stuckShurikens[i].life <= 0) stuckShurikens.splice(i, 1);
+      }
+
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.life -= dt;
+        const p = 1 - Math.max(0, sw.life / sw.maxLife);
+        sw.radius = 8 + (sw.maxRadius - 8) * p;
+        if (sw.life <= 0) shockwaves.splice(i, 1);
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.life -= dt;
+        pt.vy += 460 * dt;
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        if (pt.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function handleKnockout(victim, label) {
+      if (gameState.screen !== 'playing') return;
+      if (gameState.playMode === 'online' && gameState.netRole === 'guest') return;
+      if (victim.koTimer > 0) return;
+
+      victim.koTimer = 0.75;
+      gameState.screenShake = 14;
+      soundFX.ko();
+      spawnMagicBurst(victim.x, Math.min(arena.groundY, victim.y - 24), victim.primaryColor, 76, 18);
+      addFloatingText(victim.x, Math.min(arena.groundY - 40, victim.y - 50), label, '#fde047');
+
+      const winnerId = victim.id === 1 ? 2 : 1;
+      if (winnerId === 1) gameState.p1Score += 1;
+      else gameState.p2Score += 1;
+
+      if (gameState.p1Score >= gameState.winTarget || gameState.p2Score >= gameState.winTarget) {
+        const winLabel = gameState.p1Score >= gameState.winTarget ? 'PEMAIN 1 MENANG!' : (gameState.p2Bot ? 'BOT AI MENANG!' : 'PEMAIN 2 MENANG!');
+        soundFX.victory();
+        showGameOverScreen(winLabel, `${label} — Target ${gameState.winTarget} tercapai`, false);
+        return;
+      }
+
+      setTimeout(() => {
+        if (gameState.screen !== 'playing') return;
+        p1.respawnAt(arena.width * 0.28, arena.groundY - 24);
+        p2.respawnAt(arena.width * 0.72, arena.groundY - 24);
+        projectiles.length = 0;
+        addFloatingText(arena.width * 0.5, arena.groundY - 170, 'RONDE BARU!', '#38bdf8');
+      }, 650);
+    }
+
+    function resolveTimerExpiry() {
+      if (gameState.playMode === 'online' && gameState.netRole === 'guest') return;
+      let winText = 'SERI!';
+      if (p1.hp > p2.hp) {
+        gameState.p1Score += 1;
+        winText = 'PEMAIN 1 MENANG!';
+      } else if (p2.hp > p1.hp) {
+        gameState.p2Score += 1;
+        winText = gameState.p2Bot ? 'BOT AI MENANG!' : 'PEMAIN 2 MENANG!';
+      }
+      soundFX.victory();
+      showGameOverScreen(winText, 'Waktu duel habis', false);
+    }
+
+    // --------------------------------------------------------------------------
+    // 9. UPDATE HUD
+    // --------------------------------------------------------------------------
+    function updateHud() {
+      if (!p1 || !p2) return;
+
+      const p1Spec = WEAPONS[p1.weapon] || WEAPONS.sword;
+      const p2Spec = WEAPONS[p2.weapon] || WEAPONS.sword;
+
+      document.getElementById('p2TitleLabel').textContent =
+        gameState.p2Bot ? 'BOT AI' : (gameState.playMode === 'online' ? 'PEMAIN 2 (ONLINE)' : 'PEMAIN 2');
+
+      document.getElementById('p1WeaponBadge').textContent = p1Spec.name.toUpperCase();
+      document.getElementById('p2WeaponBadge').textContent = p2Spec.name.toUpperCase();
+
+      document.getElementById('p1HpBar').style.width = `${Math.max(0, Math.min(100, (p1.hp / p1.maxHp) * 100))}%`;
+      document.getElementById('p2HpBar').style.width = `${Math.max(0, Math.min(100, (p2.hp / p2.maxHp) * 100))}%`;
+
+      document.getElementById('p1HpText').textContent = `${Math.ceil(p1.hp)}/${p1.maxHp}`;
+      document.getElementById('p2HpText').textContent = `${Math.ceil(p2.hp)}/${p2.maxHp}`;
+
+      const p1IsMagic = p1.weapon === 'magic';
+      const p2IsMagic = p2.weapon === 'magic';
+      document.getElementById('p1ResLabel').textContent = p1IsMagic ? 'MANA' : 'STAMINA';
+      document.getElementById('p2ResLabel').textContent = p2IsMagic ? 'MANA' : 'STAMINA';
+
+      const p1ResVal = p1IsMagic ? p1.mana : p1.stamina;
+      const p2ResVal = p2IsMagic ? p2.mana : p2.stamina;
+      const p1ResBar = document.getElementById('p1ResBar');
+      const p2ResBar = document.getElementById('p2ResBar');
+      p1ResBar.style.width = `${Math.max(0, Math.min(100, p1ResVal))}%`;
+      p2ResBar.style.width = `${Math.max(0, Math.min(100, p2ResVal))}%`;
+      p1ResBar.className = `h-full transition-all duration-100 ${p1IsMagic ? 'bg-gradient-to-r from-fuchsia-500 to-purple-300' : 'bg-gradient-to-r from-sky-500 to-cyan-300'}`;
+      p2ResBar.className = `h-full transition-all duration-100 ml-auto ${p2IsMagic ? 'bg-gradient-to-r from-fuchsia-500 to-purple-300' : 'bg-gradient-to-r from-emerald-500 to-lime-300'}`;
+
+      const secs = Math.max(0, Math.ceil(gameState.matchTimer));
+      const mm = Math.floor(secs / 60);
+      const ss = String(secs % 60).padStart(2, '0');
+      document.getElementById('matchTimerDisplay').textContent = `${mm}:${ss}`;
+
+      const modePrefix = gameState.winMode === 'stock' ? 'NYAWA' : 'RONDE';
+      document.getElementById('scoreDisplay').textContent =
+        `${modePrefix} ${gameState.p1Score} - ${gameState.p2Score} (TARGET ${gameState.winTarget})`;
+    }
+
+    // --------------------------------------------------------------------------
+    // 10. RENDER ARENA, PROYEKTIL & STICKMAN
+    // --------------------------------------------------------------------------
+    function renderArena() {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      if (gameState.screenShake > 0) {
+        const sx = (Math.random() - 0.5) * gameState.screenShake * 1.6;
+        const sy = (Math.random() - 0.5) * gameState.screenShake * 1.6;
+        ctx.translate(sx, sy);
+      }
+
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, arena.height);
+      bgGrad.addColorStop(0, '#070b14');
+      bgGrad.addColorStop(0.55, '#0f172a');
+      bgGrad.addColorStop(1, '#1e1b4b');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, arena.width, arena.height);
+
+      // Grid latar belakang halus
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.06)';
+      ctx.lineWidth = 1;
+      for (let gx = 0; gx < arena.width; gx += 48) {
+        ctx.beginPath();
+        ctx.moveTo(gx, 0);
+        ctx.lineTo(gx, arena.height);
+        ctx.stroke();
+      }
+      for (let gy = 0; gy < arena.height; gy += 48) {
+        ctx.beginPath();
+        ctx.moveTo(0, gy);
+        ctx.lineTo(arena.width, gy);
+        ctx.stroke();
+      }
+
+      // Jurang berbahaya di bawah lantai
+      const hazardGrad = ctx.createLinearGradient(0, arena.groundY + 18, 0, arena.height);
+      hazardGrad.addColorStop(0, 'rgba(244, 63, 94, 0.02)');
+      hazardGrad.addColorStop(1, 'rgba(244, 63, 94, 0.28)');
+      ctx.fillStyle = hazardGrad;
+      ctx.fillRect(0, arena.groundY + 18, arena.width, Math.max(0, arena.height - arena.groundY));
+
+      // Platform melayang
+      for (const plat of arena.platforms) {
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(plat.x, plat.y, plat.w, plat.h, 7);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(plat.x + 8, plat.y, plat.w - 16, 3);
+      }
+
+      // Lantai utama arena
+      const floorW = arena.groundRight - arena.groundLeft;
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(arena.groundLeft, arena.groundY, floorW, 20, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillRect(arena.groundLeft + 10, arena.groundY, floorW - 20, 3);
+
+      // Shuriken yang menancap
+      for (const st of stuckShurikens) {
+        ctx.save();
+        ctx.translate(st.x, st.y);
+        ctx.rotate(st.angle);
+        ctx.globalAlpha = Math.min(1, st.life / 1.2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.beginPath();
+        for (let k = 0; k < 4; k++) {
+          const a = (k * Math.PI) / 2;
+          ctx.lineTo(Math.cos(a) * 8, Math.sin(a) * 8);
+          ctx.lineTo(Math.cos(a + Math.PI / 4) * 3, Math.sin(a + Math.PI / 4) * 3);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Proyektil
+      for (const pr of projectiles) {
+        ctx.save();
+        ctx.translate(pr.x, pr.y);
+        if (pr.kind === 'shuriken') {
+          ctx.rotate(pr.spin);
+          ctx.fillStyle = '#f8fafc';
+          ctx.strokeStyle = pr.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let k = 0; k < 4; k++) {
+            const a = (k * Math.PI) / 2;
+            ctx.lineTo(Math.cos(a) * 11, Math.sin(a) * 11);
+            ctx.lineTo(Math.cos(a + Math.PI / 4) * 4, Math.sin(a + Math.PI / 4) * 4);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = pr.color;
+          ctx.beginPath();
+          ctx.arc(0, 0, pr.radius + 3, 0, Math.PI * 2);
+          ctx.globalAlpha = 0.35;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#f5d0fe';
+          ctx.beginPath();
+          ctx.arc(0, 0, pr.radius * 0.65, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      if (p1) drawStickman(p1);
+      if (p2) drawStickman(p2);
+
+      // Gelombang kejut & partikel
+      for (const sw of shockwaves) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, sw.life / sw.maxLife);
+        ctx.strokeStyle = sw.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      for (const pt of particles) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+        ctx.fillStyle = pt.color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Teks pop-up pertarungan
+      for (const ft of floatingTexts) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, ft.life / 0.35);
+        ctx.font = '900 14px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#020617';
+        ctx.fillText(ft.text, ft.x + 1.5, ft.y + 1.5);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    function drawStickman(f) {
+      if (f.koTimer > 0 && Math.floor(f.koTimer * 24) % 2 === 0) return;
+
+      ctx.save();
+      if (f.invulnTimer > 0 && Math.floor(f.invulnTimer * 28) % 2 === 0) {
+        ctx.globalAlpha = 0.55;
+      }
+
+      const hipX = f.x;
+      const hipY = f.y - 22;
+      const shoulderX = hipX + Math.sin(f.torsoLean) * 24;
+      const shoulderY = hipY - Math.cos(f.torsoLean) * 24;
+      const headX = shoulderX + Math.sin(f.torsoLean) * 12;
+      const headY = shoulderY - 13;
+
+      if (f.y <= arena.groundY + 10 && f.x >= arena.groundLeft && f.x <= arena.groundRight) {
+        const heightAbove = Math.max(0, arena.groundY - f.y);
+        const shadowScale = Math.max(0.25, 1 - heightAbove / 260);
+        ctx.fillStyle = `rgba(2, 6, 23, ${0.45 * shadowScale})`;
+        ctx.beginPath();
+        ctx.ellipse(f.x, arena.groundY + 2, 22 * shadowScale, 5 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const drawLimb = (x0, y0, x1, y1, x2, y2, width, color) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      };
+
+      const footL = { x: hipX + f.footL.x, y: hipY + f.footL.y };
+      const footR = { x: hipX + f.footR.x, y: hipY + f.footR.y };
+      const kneeL = solveTwoBoneJoint(hipX, hipY, footL.x, footL.y, 15, 15, f.facing);
+      const kneeR = solveTwoBoneJoint(hipX, hipY, footR.x, footR.y, 15, 15, f.facing);
+
+      drawLimb(hipX, hipY, kneeL.x, kneeL.y, footL.x, footL.y, 6, f.secondaryColor);
+      drawLimb(hipX, hipY, kneeR.x, kneeR.y, footR.x, footR.y, 6.5, f.primaryColor);
+
+      const handB = { x: shoulderX + f.handBack.x, y: shoulderY + f.handBack.y };
+      const elbowB = solveTwoBoneJoint(shoulderX, shoulderY, handB.x, handB.y, 13, 13, -f.facing);
+      drawLimb(shoulderX, shoulderY, elbowB.x, elbowB.y, handB.x, handB.y, 5.5, f.secondaryColor);
+
+      ctx.strokeStyle = f.primaryColor;
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hipX, hipY);
+      ctx.lineTo(shoulderX, shoulderY);
+      ctx.stroke();
+
+      const handF = { x: shoulderX + f.handFront.x, y: shoulderY + f.handFront.y };
+      const elbowF = solveTwoBoneJoint(shoulderX, shoulderY, handF.x, handF.y, 13, 13, f.facing);
+      drawLimb(shoulderX, shoulderY, elbowF.x, elbowF.y, handF.x, handF.y, 6, f.primaryColor);
+
+      ctx.fillStyle = '#0b1120';
+      ctx.strokeStyle = f.primaryColor;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(headX, headY, 11.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = f.accentColor;
+      ctx.beginPath();
+      ctx.arc(headX + f.facing * 4.5, headY - 1, 2.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawEquippedWeapon(f, handF.x, handF.y, elbowF.x, elbowF.y);
+
+      if (f.shieldActive) {
+        const sx = f.x + f.facing * 24;
+        const sy = f.y - 36;
+        ctx.save();
+        ctx.translate(sx, sy);
+        if (f.facing < 0) ctx.scale(-1, 1);
+
+        const parrying = f.parryTimer > 0;
+        ctx.strokeStyle = parrying ? '#fde047' : '#38bdf8';
+        ctx.fillStyle = parrying ? 'rgba(253, 224, 71, 0.25)' : 'rgba(56, 189, 248, 0.18)';
+        ctx.lineWidth = parrying ? 4 : 3;
+        ctx.beginPath();
+        ctx.arc(-8, 0, 28, -0.85, 0.85);
+        ctx.lineTo(-4, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (f.slashTimer > 0) {
+        const progress = 1 - f.slashTimer / 0.18;
+        const startAngle = f.facing > 0 ? -1.25 + progress * 2.2 : Math.PI + 1.25 - progress * 2.2;
+        const endAngle = f.facing > 0 ? startAngle + 0.95 : startAngle - 0.95;
+
+        ctx.save();
+        ctx.strokeStyle = f.accentColor;
+        ctx.lineWidth = 6 * (1 - progress * 0.4);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(shoulderX + f.facing * 8, shoulderY + 4, 48, Math.min(startAngle, endAngle), Math.max(startAngle, endAngle));
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (f.bashTimer > 0) {
+        ctx.save();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(f.x + f.facing * 26, f.y - 34, 22, -0.8, 0.8);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.font = '700 11px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = f.accentColor;
+      const tag = f.id === 1 ? 'P1' : (gameState.p2Bot ? 'BOT' : 'P2');
+      ctx.fillText(tag, headX, headY - 18);
+
+      ctx.restore();
+    }
+
+    function drawEquippedWeapon(f, hx, hy, ex, ey) {
+      ctx.save();
+      const angle = Math.atan2(hy - ey, hx - ex);
+      ctx.translate(hx, hy);
+      ctx.rotate(angle);
+
+      if (f.weapon === 'sword') {
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-4, -6);
+        ctx.lineTo(-4, 6);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#f8fafc';
+        ctx.lineWidth = 4.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(36, 0);
+        ctx.stroke();
+
+        ctx.strokeStyle = f.accentColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(4, -1.2);
+        ctx.lineTo(32, -1.2);
+        ctx.stroke();
+      } else if (f.weapon === 'shuriken') {
+        ctx.rotate(performance.now() * 0.008);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let k = 0; k < 4; k++) {
+          const a = (k * Math.PI) / 2;
+          ctx.lineTo(Math.cos(a) * 10, Math.sin(a) * 10);
+          ctx.lineTo(Math.cos(a + Math.PI / 4) * 3.5, Math.sin(a + Math.PI / 4) * 3.5);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else if (f.weapon === 'shield') {
+        ctx.fillStyle = 'rgba(14, 165, 233, 0.35)';
+        ctx.strokeStyle = '#7dd3fc';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(2, -13, 9, 26, 4);
+        ctx.fill();
+        ctx.stroke();
+      } else if (f.weapon === 'magic') {
+        ctx.strokeStyle = '#a855f7';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(-6, 0);
+        ctx.lineTo(24, 0);
+        ctx.stroke();
+
+        const orbGlow = 6 + Math.sin(performance.now() * 0.01) * 1.5;
+        ctx.fillStyle = '#e879f9';
+        ctx.beginPath();
+        ctx.arc(27, 0, orbGlow, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    function solveTwoBoneJoint(x0, y0, x1, y1, len1, len2, bendDir) {
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const dist = Math.max(2, Math.min(len1 + len2 - 0.5, Math.hypot(dx, dy)));
+      const baseAngle = Math.atan2(dy, dx);
+      const cosA = Math.max(-1, Math.min(1, (len1 * len1 + dist * dist - len2 * len2) / (2 * len1 * dist)));
+      const offsetAngle = Math.acos(cosA) * (bendDir >= 0 ? 1 : -1);
+      const jointAngle = baseAngle + offsetAngle;
+      return {
+        x: x0 + Math.cos(jointAngle) * len1,
+        y: y0 + Math.sin(jointAngle) * len1
+      };
+    }
+
+    // --------------------------------------------------------------------------
+    // 11. ALUR LAYAR, JEDA, KEMENANGAN & LOOP UTAMA
+    // --------------------------------------------------------------------------
+    function showScreenOverlay(name) {
+      startScreen.classList.add('hidden');
+      pauseScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+
+      if (name === 'start') startScreen.classList.remove('hidden');
+      else if (name === 'paused') pauseScreen.classList.remove('hidden');
+      else if (name === 'gameover') gameOverScreen.classList.remove('hidden');
+    }
+
+    function startNewMatch(fromRemote = false) {
+      ensureFightersInitialized();
+
+      p1.resetForMatch(arena.width * 0.28, arena.groundY - 24, gameState.p1Loadout);
+      p2.resetForMatch(arena.width * 0.72, arena.groundY - 24, gameState.p2Loadout);
+
+      gameState.p1Score = 0;
+      gameState.p2Score = 0;
+      gameState.matchTimer = gameState.matchDuration;
+      gameState.hitstopTimer = 0;
+      gameState.screenShake = 0;
+      gameState.paused = false;
+      gameState.screen = 'playing';
+      gameState.lastWinnerText = '';
+      gameState.lastReasonText = '';
+
+      projectiles.length = 0;
+      stuckShurikens.length = 0;
+      particles.length = 0;
+      shockwaves.length = 0;
+      floatingTexts.length = 0;
+
+      if (gameState.playMode === 'online' && !fromRemote) {
+        netSync.send({
+          type: 'start_match',
+          p1Loadout: gameState.p1Loadout,
+          p2Loadout: gameState.p2Loadout,
+          mode: gameState.winMode,
+          target: gameState.winTarget,
+          timer: gameState.matchDuration
+        });
+      }
+
+      showScreenOverlay(null);
+      updateHud();
+      lockLandscapeOrientation();
+      addFloatingText(arena.width * 0.5, arena.groundY - 175, 'MULAI!', '#fde047');
+    }
+
+    function lockLandscapeOrientation() {
+      const isMobileOrTouch = (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches) || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      if (!isMobileOrTouch) return;
+      try {
+        if (screen.orientation && typeof screen.orientation.lock === 'function') {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+      } catch (_) {}
+    }
+
+    function bindAutoLandscapeOnOpen() {
+      lockLandscapeOrientation();
+      const triggerOnce = () => {
+        lockLandscapeOrientation();
+        window.removeEventListener('pointerdown', triggerOnce);
+        window.removeEventListener('touchstart', triggerOnce);
+        window.removeEventListener('click', triggerOnce);
+      };
+      window.addEventListener('pointerdown', triggerOnce, { passive: true });
+      window.addEventListener('touchstart', triggerOnce, { passive: true });
+      window.addEventListener('click', triggerOnce, { passive: true });
+    }
+
+    document.getElementById('requestLandscapeBtn')?.addEventListener('click', () => {
+      try {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch (_) {}
+      lockLandscapeOrientation();
+    });
+
+    function togglePause() {
+      if (gameState.screen === 'playing') {
+        gameState.paused = true;
+        gameState.screen = 'paused';
+        showScreenOverlay('paused');
+      } else if (gameState.screen === 'paused') {
+        gameState.paused = false;
+        gameState.screen = 'playing';
+        showScreenOverlay(null);
+      }
+    }
+
+    function showGameOverScreen(winnerText, reasonText, fromRemote = false) {
+      gameState.screen = 'gameover';
+      gameState.paused = false;
+      gameState.lastWinnerText = winnerText;
+      gameState.lastReasonText = reasonText;
+
+      document.getElementById('winnerTitle').textContent = winnerText;
+      document.getElementById('winnerReason').textContent = reasonText;
+      document.getElementById('finalScoreSummary').textContent =
+        `Skor Akhir — P1: ${gameState.p1Score} | ${gameState.p2Bot ? 'Bot AI' : 'P2'}: ${gameState.p2Score}`;
+
+      if (gameState.playMode === 'online' && gameState.netRole === 'host' && !fromRemote) {
+        netSync.send({
+          type: 'world_snapshot',
+          matchTimer: gameState.matchTimer,
+          p1Score: gameState.p1Score,
+          p2Score: gameState.p2Score,
+          screen: 'gameover',
+          winnerText,
+          reasonText,
+          p1: getFighterSnapshot(p1),
+          p2: getFighterSnapshot(p2)
+        });
+      }
+
+      showScreenOverlay('gameover');
+    }
+
+    document.getElementById('startMatchBtn').addEventListener('click', () => startNewMatch(false));
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      if (gameState.screen === 'playing' || gameState.screen === 'paused') {
+        togglePause();
+      }
+    });
+    document.getElementById('resumeBtn').addEventListener('click', () => {
+      if (gameState.screen === 'paused') togglePause();
+    });
+    document.getElementById('restartFromPauseBtn').addEventListener('click', () => startNewMatch(false));
+    document.getElementById('exitToMenuBtn').addEventListener('click', () => {
+      gameState.screen = 'start';
+      gameState.paused = false;
+      showScreenOverlay('start');
+      syncStartScreenUI();
+    });
+    document.getElementById('rematchBtn').addEventListener('click', () => startNewMatch(false));
+    document.getElementById('backToMenuBtn').addEventListener('click', () => {
+      gameState.screen = 'start';
+      gameState.paused = false;
+      showScreenOverlay('start');
+      syncStartScreenUI();
+    });
+
+    let p1 = null;
+    let p2 = null;
+    let lastFrameTime = performance.now();
+
+    function ensureFightersInitialized() {
+      if (!p1) {
+        p1 = new Fighter(1, arena.width * 0.28, arena.groundY - 20, gameState.p1Loadout);
+      }
+      if (!p2) {
+        p2 = new Fighter(2, arena.width * 0.72, arena.groundY - 20, gameState.p2Loadout);
+      }
+    }
+
+    function gameLoop(now) {
+      try {
+        ensureFightersInitialized();
+        const currentNow = typeof now === 'number' ? now : performance.now();
+        const rawDt = (currentNow - lastFrameTime) / 1000;
+        lastFrameTime = currentNow;
+        const dt = Math.min(0.033, Math.max(0.001, rawDt));
+
+        if (gameState.hitstopTimer > 0) {
+          gameState.hitstopTimer = Math.max(0, gameState.hitstopTimer - dt);
+        } else {
+          if (gameState.screen === 'playing') {
+            if (gameState.playMode !== 'online' || gameState.netRole !== 'guest') {
+              gameState.matchTimer = Math.max(0, gameState.matchTimer - dt);
+              if (gameState.matchTimer <= 0) {
+                resolveTimerExpiry();
+              }
+            }
+
+            applyContinuousInputs(dt);
+            p1.update(dt, p2);
+            p2.update(dt, p1);
+            updateCombatEntities(dt, p1, p2);
+            netSync.broadcastWorldSnapshot(dt);
+          }
+
+          updateHud();
+        }
+
+        if (gameState.screenShake > 0) {
+          gameState.screenShake = Math.max(0, gameState.screenShake - dt * 36);
+        }
+
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+          const ft = floatingTexts[i];
+          ft.y += ft.vy * dt;
+          ft.life -= dt;
+          if (ft.life <= 0) floatingTexts.splice(i, 1);
+        }
+
+        renderArena();
+      } catch (err) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#070b14';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fda4af';
+        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.fillText('Error: ' + (err && err.message ? err.message : 'Terjadi kesalahan'), 24, 48);
+        ctx.restore();
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener('error', (event) => {
+      try {
+        if (!canvas || !ctx) return;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#070b14';
+        ctx.fillRect(0, 0, canvas.width || 800, canvas.height || 600);
+        ctx.fillStyle = '#fda4af';
+        ctx.font = 'bold 15px Inter, sans-serif';
+        ctx.fillText('Error: ' + (event && event.message ? event.message : 'Terjadi kesalahan'), 20, 40);
+        ctx.restore();
+      } catch (_) {}
+    });
+
+    function safeBoot() {
+      try {
+        resizeCanvas();
+        ensureFightersInitialized();
+        syncStartScreenUI();
+        bindAutoLandscapeOnOpen();
+      } catch (_) {}
+      requestAnimationFrame(gameLoop);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', safeBoot, { once: true });
+    } else {
+      safeBoot();
+    }
+  </script>
+</body>
+</html>
